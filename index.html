@@ -1,3 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>autocompose — back shortly</title>
+<meta name="description" content="autocompose is under maintenance. We're sharpening the suggestions and smoothing the edges. Back shortly." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --canvas: #FBFAFF;
+    --card: #FFFFFF;
+    --ink: #16131F;
+    --ink-soft: #4A4458;
+    --muted: #8B85A0;
+    --faint: #B9B2C9;
+    --ghost: #B9AEDC;
+    --violet: #7C3AED;
+    --violet-strong: #6D28D9;
+    --lilac: #A78BFA;
+    --border: #ECE7F6;
+    --border-soft: #F4F0FB;
+    --glow-a: #E7D9FF;
+    --glow-b: #F4E9FF;
+    --field-bg: #FBFAFE;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { height: 100%; }
+
+  body {
+    margin: 0;
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
+    color: var(--ink);
+    background: var(--canvas);
+    min-height: 100dvh;
+    display: grid;
+    place-items: center;
+    padding: 28px 20px;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Ambient violet aurora */
+  .aurora {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .aurora span {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(70px);
+    opacity: 0.7;
+  }
+  .aurora .a1 {
+    width: 46vmax; height: 46vmax;
+    left: -14vmax; top: -18vmax;
+    background: radial-gradient(circle at 30% 30%, var(--glow-a), transparent 70%);
+    animation: drift1 22s ease-in-out infinite alternate;
+  }
+  .aurora .a2 {
+    width: 40vmax; height: 40vmax;
+    right: -16vmax; bottom: -20vmax;
+    background: radial-gradient(circle at 60% 40%, var(--glow-b), transparent 70%);
+    animation: drift2 26s ease-in-out infinite alternate;
+  }
+  @keyframes drift1 { to { transform: translate(6vmax, 4vmax) scale(1.08); } }
+  @keyframes drift2 { to { transform: translate(-5vmax, -3vmax) scale(1.1); } }
+
+  .stage {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 600px;
+  }
+
+  /* ---- Compose card ---- */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    box-shadow:
+      0 1px 0 rgba(124,58,237,0.04),
+      0 24px 60px -28px rgba(60,30,120,0.32),
+      0 8px 24px -16px rgba(60,30,120,0.18);
+    overflow: hidden;
+  }
+
+  .bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .mark { width: 30px; height: 30px; display: block; flex: none; }
+  .wordmark {
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: -0.02em;
+  }
+  .wordmark b { color: var(--violet); font-weight: 700; }
+
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--violet-strong);
+    background: #F4ECFF;
+    border: 1px solid #E6D8FF;
+    padding: 6px 11px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .status .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--violet);
+    box-shadow: 0 0 0 0 rgba(124,58,237,0.5);
+    animation: pulse 2s ease-out infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(124,58,237,0.45); }
+    70% { box-shadow: 0 0 0 8px rgba(124,58,237,0); }
+    100% { box-shadow: 0 0 0 0 rgba(124,58,237,0); }
+  }
+
+  /* ---- Email fields ---- */
+  .fields { padding: 6px 22px 0; }
+  .row {
+    display: flex;
+    gap: 12px;
+    padding: 13px 0;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 14.5px;
+    line-height: 1.5;
+  }
+  .row .label {
+    color: var(--muted);
+    min-width: 58px;
+    font-weight: 500;
+    flex: none;
+  }
+  .row .val { color: var(--ink-soft); }
+  .row .val .pill {
+    background: var(--field-bg);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 2px 9px;
+    color: var(--violet-strong);
+    font-weight: 500;
+    font-size: 13px;
+  }
+  #subjectVal { color: var(--ink); font-weight: 600; }
+
+  .body {
+    padding: 22px;
+    font-size: 15.5px;
+    line-height: 1.72;
+    color: var(--ink-soft);
+    min-height: 196px;
+    white-space: pre-wrap;
+  }
+  .body .sign { color: var(--ink); font-weight: 600; }
+  .ghost { color: var(--ghost); }
+  .tabhint {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: 8px;
+    transform: translateY(-1px);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--violet-strong);
+    background: #F4ECFF;
+    border: 1px solid #E6D8FF;
+    border-radius: 6px;
+    padding: 2px 7px;
+    vertical-align: middle;
+  }
+  .caret {
+    display: inline-block;
+    width: 2px;
+    height: 1.05em;
+    margin-left: 1px;
+    transform: translateY(2px);
+    background: var(--violet);
+    border-radius: 2px;
+    animation: blink 1.05s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ---- Toolbar ---- */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border-soft);
+    background: linear-gradient(to bottom, #FFFFFF, #FCFAFF);
+  }
+  .ai-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+  .ai-state svg { width: 15px; height: 15px; }
+  .send {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--faint);
+    background: var(--field-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 15px;
+    cursor: not-allowed;
+  }
+  .send svg { width: 14px; height: 14px; }
+
+  /* ---- Below the card ---- */
+  .footer {
+    margin-top: 22px;
+    text-align: center;
+    font-size: 13.5px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .footer a {
+    color: var(--violet-strong);
+    text-decoration: none;
+    font-weight: 600;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.15s ease;
+  }
+  .footer a:hover, .footer a:focus-visible { border-color: var(--lilac); }
+  .footer .copy { margin-top: 7px; font-size: 12px; color: var(--faint); }
+
+  :focus-visible { outline: 2px solid var(--violet); outline-offset: 3px; border-radius: 4px; }
+
+  @media (max-width: 480px) {
+    body { padding: 18px 14px; }
+    .bar { padding: 14px 16px; }
+    .fields { padding: 4px 16px 0; }
+    .body { padding: 18px 16px; font-size: 15px; }
+    .toolbar { padding: 12px 16px; }
+    .wordmark { font-size: 15px; }
+    .status { font-size: 10px; padding: 5px 9px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .aurora span, .status .dot, .caret { animation: none; }
+    .caret { opacity: 1; }
+  }
+</style>
+</head>
 <body>
-  TEST
+  <div class="aurora" aria-hidden="true">
+    <span class="a1"></span>
+    <span class="a2"></span>
+  </div>
+
+  <main class="stage">
+    <div class="card" role="img" aria-label="autocompose is under maintenance and will be back shortly">
+      <div class="bar">
+        <div class="brand">
+          <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+            <defs>
+              <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#A78BFA"/>
+                <stop offset="1" stop-color="#7C3AED"/>
+              </linearGradient>
+            </defs>
+            <rect x="2" y="2" width="28" height="28" rx="9" fill="url(#g)"/>
+            <rect x="12.7" y="9" width="2.7" height="14" rx="1.35" fill="#fff" opacity="0.96"/>
+            <path d="M22.2 7.6 l1.15 2.55 2.55 1.15 -2.55 1.15 -1.15 2.55 -1.15 -2.55 -2.55 -1.15 2.55 -1.15 z" fill="#fff"/>
+          </svg>
+          <span class="wordmark">auto<b>compose</b></span>
+        </div>
+        <span class="status"><span class="dot"></span>Under maintenance</span>
+      </div>
+
+      <div class="fields">
+        <div class="row">
+          <span class="label">To</span>
+          <span class="val"><span class="pill">everyone</span></span>
+        </div>
+        <div class="row">
+          <span class="label">Subject</span>
+          <span class="val" id="subjectVal"></span>
+        </div>
+      </div>
+
+      <div class="body" id="body"></div>
+
+      <div class="toolbar">
+        <span class="ai-state" id="aiState">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 3 l1.6 4.4 4.4 1.6 -4.4 1.6 -1.6 4.4 -1.6 -4.4 -4.4 -1.6 4.4 -1.6 z" fill="#A78BFA"/>
+          </svg>
+          <span id="aiText">Auto-composing…</span>
+        </span>
+        <button class="send" type="button" disabled aria-label="Sending is paused during maintenance">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 12 L20 4 L13 20 L11 13 Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+          </svg>
+          Send · paused
+        </button>
+      </div>
+    </div>
+
+    <p class="footer">
+      We're back soon. Questions in the meantime? <a href="mailto:support@autocompose.ai">support@autocompose.ai</a>
+      <span class="copy">© <span id="yr"></span> autocompose.ai</span>
+    </p>
+  </main>
+
+<script>
+(function () {
+  document.getElementById('yr').textContent = new Date().getFullYear();
+
+  var subjectEl = document.getElementById('subjectVal');
+  var bodyEl = document.getElementById('body');
+  var aiText = document.getElementById('aiText');
+
+  var SUBJECT = "A quick note while we tidy up";
+
+  // Body is built as a sequence. "ghost" segments type in muted, then get accepted.
+  var SEGMENTS = [
+    { t: "Hi there,\n\n" },
+    { t: "We're putting the finishing touches on autocompose — sharpening the suggestions, smoothing the edges, and " },
+    { t: "making it faster than before.", ghost: true },
+    { t: "\n\nWe'll be back shortly. Thanks for your patience.\n\n" },
+    { t: "— The autocompose team", sign: true }
+  ];
+
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var caret = document.createElement('span');
+  caret.className = 'caret';
+
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  function buildStatic() {
+    subjectEl.textContent = SUBJECT;
+    SEGMENTS.forEach(function (seg) {
+      var span = document.createElement('span');
+      if (seg.sign) span.className = 'sign';
+      span.textContent = seg.t;
+      bodyEl.appendChild(span);
+    });
+    aiText.textContent = 'Draft ready';
+  }
+
+  async function typeInto(el, text, speed) {
+    el.appendChild(caret);
+    for (var i = 0; i < text.length; i++) {
+      caret.insertAdjacentText('beforebegin', text[i]);
+      var ch = text[i];
+      var d = ch === ' ' ? speed * 0.5 : (ch === '\n' ? speed * 2.4 : speed);
+      await sleep(d + Math.random() * 18);
+    }
+  }
+
+  async function run() {
+    await sleep(450);
+
+    // Subject line
+    await typeInto(subjectEl, SUBJECT, 34);
+    await sleep(320);
+
+    // Move caret to body
+    bodyEl.appendChild(caret);
+    await sleep(150);
+
+    for (var s = 0; s < SEGMENTS.length; s++) {
+      var seg = SEGMENTS[s];
+
+      if (seg.ghost) {
+        // AI suggestion appears all at once, muted, with a Tab hint
+        aiText.textContent = 'Suggesting…';
+        var g = document.createElement('span');
+        g.className = 'ghost';
+        g.textContent = seg.t;
+        var hint = document.createElement('span');
+        hint.className = 'tabhint';
+        hint.textContent = '⇥ Tab';
+        bodyEl.insertBefore(g, caret);
+        bodyEl.insertBefore(hint, caret);
+        await sleep(1150);
+        // Accept the suggestion
+        g.className = '';
+        hint.remove();
+        await sleep(260);
+        continue;
+      }
+
+      var span = document.createElement('span');
+      if (seg.sign) span.className = 'sign';
+      bodyEl.insertBefore(span, caret);
+      aiText.textContent = 'Auto-composing…';
+      await typeInto(span, seg.t, 26);
+    }
+
+    aiText.textContent = 'Draft ready';
+    // caret stays blinking at the end
+  }
+
+  if (reduce) {
+    buildStatic();
+  } else {
+    run();
+  }
+})();
+</script>
 </body>
+</html>
